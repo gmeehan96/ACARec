@@ -123,7 +123,7 @@ def main():
     cold_item_idx = data_info_dict["cold_item"]
     print(f"Dataset: {args.dataset}, User num: {user_num}, Item num: {item_num}.")
 
-    item_content = np.load("./data/%s/muq_embs.npy" % args.dataset).astype(np.float32)
+    item_content = np.load("./data/%s/embs/muq_embs.npy" % args.dataset).astype(np.float32)
     if args.model == "CLCRec":
         configs = {
             "m4a_onion": {
