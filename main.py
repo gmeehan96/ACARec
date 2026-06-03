@@ -89,7 +89,7 @@ def main():
     print(f"Dataset: {args.dataset}, User num: {user_num}, Item num: {item_num}.")
 
     item_artist_map = np.load(f"./data/{args.dataset}/item_artist_mapping.npy")
-    item_content = np.load(f"./data/{args.dataset}/embs.npy").astype(np.float32)
+    item_content = np.load(f"./data/{args.dataset}/muq_embs.npy").astype(np.float32)
 
     config = {
         "n_artist_items": 5,
