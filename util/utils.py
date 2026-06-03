@@ -6,7 +6,7 @@ import numpy as np
 import random
 import os
 import scipy.sparse as sp
-from functools import partial
+
 
 def next_batch_artist(
     data,
@@ -43,7 +43,7 @@ def next_batch_artist(
                 num_sample = min(len(list(item_artist_tracks)), n_artist_tracks)
                 artist_i_idx_sampled = sample(item_artist_tracks, num_sample)
                 artist_i_idx_sampled = [data.item[i] for i in artist_i_idx_sampled]
-                while len(artist_i_idx_sampled) < n_artist_tracks:
+                while len(artist_i_idx_sampled) < n_artist_tracks + n_negs:
                     artist_i_idx_sampled.append(-1)
 
                 i_idx.append(data.item[item])
@@ -102,20 +102,76 @@ def get_model_eval_metrics(model):
     for split in ["val", "test"]:
         eval_fns[split]()
         if split == "val":
-            warm_hr, warm_recall, warm_ndcg = model.warm_valid_results
-            cold_hr, cold_recall, cold_ndcg = model.cold_valid_results
+            warm_recall, warm_ndcg = model.warm_valid_results
+            cold_recall, cold_ndcg = model.cold_valid_results
         if split == "test":
-            warm_hr, warm_recall, warm_ndcg = model.warm_test_results
-            cold_hr, cold_recall, cold_ndcg = model.cold_test_results
+            warm_recall, warm_ndcg = model.warm_test_results
+            cold_recall, cold_ndcg = model.cold_test_results
         out_dict = {
             **out_dict,
             **{
-                "%s_warm_hr" % split: warm_hr,
                 "%s_warm_recall" % split: warm_recall,
                 "%s_warm_ndcg" % split: warm_ndcg,
-                "%s_cold_hr" % split: cold_hr,
                 "%s_cold_recall" % split: cold_recall,
                 "%s_cold_ndcg" % split: cold_ndcg,
             },
         }
     return out_dict
+
+def next_batch_item_only(data,batch_size,training=True):
+    if training:
+        item_list = list(data.source_warm_item_idx)
+        data_size = len(item_list)
+        items = sample(item_list,data_size)
+    else:
+        items = list(data.source_cold_item_idx)
+        data_size = len(items)
+    
+    ptr = 0
+    while ptr < data_size:
+        if ptr + batch_size < data_size:
+            batch_end = ptr + batch_size
+        else:
+            batch_end = data_size
+        
+        i_idx = [data.item[items[i]] for i in range(ptr, batch_end)]
+        ptr = batch_end
+        yield i_idx
+
+
+def bpr_loss(user_emb, pos_item_emb, neg_item_emb):
+    pos_score = torch.mul(user_emb, pos_item_emb).sum(dim=1)
+    neg_score = torch.mul(user_emb, neg_item_emb).sum(dim=1)
+    loss = -torch.log(10e-6 + torch.sigmoid(pos_score - neg_score))
+    return torch.mean(loss)
+
+
+def mse_loss(real_item_emb, item_content_emb):
+    loss = F.mse_loss(real_item_emb, item_content_emb)
+    return loss
+
+def next_batch_pairwise(data,batch_size,n_negs=1):
+    training_data = data.training_data
+    shuffle(training_data)
+    ptr = 0
+    data_size = len(training_data)
+    while ptr < data_size:
+        if ptr + batch_size < data_size:
+            batch_end = ptr + batch_size
+        else:
+            batch_end = data_size
+        users = [training_data[idx][0] for idx in range(ptr, batch_end)]
+        items = [training_data[idx][1] for idx in range(ptr, batch_end)]
+        ptr = batch_end
+        u_idx, i_idx, j_idx = [], [], []
+
+        item_list = list(data.source_warm_item_idx)
+        for i, user in enumerate(users):
+            i_idx.append(data.item[items[i]])
+            u_idx.append(data.user[user])
+            for m in range(n_negs):
+                neg_item = choice(item_list)
+                while neg_item in data.training_set_u[user]:
+                    neg_item = choice(item_list)
+                j_idx.append(data.item[neg_item])
+        yield u_idx, i_idx, j_idx
