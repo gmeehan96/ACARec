@@ -6,6 +6,7 @@ import random
 import os
 from functools import partial
 
+
 def next_batch_artist(
     data,
     batch_size,
@@ -116,22 +117,23 @@ def get_model_eval_metrics(model):
         }
     return out_dict
 
-def next_batch_item_only(data,batch_size,training=True):
+
+def next_batch_item_only(data, batch_size, training=True):
     if training:
         item_list = list(data.source_warm_item_idx)
         data_size = len(item_list)
-        items = sample(item_list,data_size)
+        items = sample(item_list, data_size)
     else:
         items = list(data.source_cold_item_idx)
         data_size = len(items)
-    
+
     ptr = 0
     while ptr < data_size:
         if ptr + batch_size < data_size:
             batch_end = ptr + batch_size
         else:
             batch_end = data_size
-        
+
         i_idx = [data.item[items[i]] for i in range(ptr, batch_end)]
         ptr = batch_end
         yield i_idx
@@ -148,7 +150,8 @@ def mse_loss(real_item_emb, item_content_emb):
     loss = F.mse_loss(real_item_emb, item_content_emb)
     return loss
 
-def next_batch_pairwise(data,batch_size,n_negs=1):
+
+def next_batch_pairwise(data, batch_size, n_negs=1):
     training_data = data.training_data
     shuffle(training_data)
     ptr = 0
@@ -191,7 +194,7 @@ def next_batch_pairwise_CLCRec(data, batch_size, n_negs=1):
         ptr = batch_end
         u_idx, i_idx = [], []
         for i, user in enumerate(users):
-            u_idx.append([data.user[user]]*(1+n_negs))
+            u_idx.append([data.user[user]] * (1 + n_negs))
             i_idx.append([data.item[items[i]]])
             for m in range(n_negs):
                 neg_item = choice(item_list)
