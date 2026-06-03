@@ -1,12 +1,10 @@
 from random import shuffle, randint, choice, sample
 import torch
 import torch.nn.functional as F
-import torch.nn as nn
 import numpy as np
 import random
 import os
-import scipy.sparse as sp
-
+from functools import partial
 
 def next_batch_artist(
     data,
@@ -43,7 +41,7 @@ def next_batch_artist(
                 num_sample = min(len(list(item_artist_tracks)), n_artist_tracks)
                 artist_i_idx_sampled = sample(item_artist_tracks, num_sample)
                 artist_i_idx_sampled = [data.item[i] for i in artist_i_idx_sampled]
-                while len(artist_i_idx_sampled) < n_artist_tracks + n_negs:
+                while len(artist_i_idx_sampled) < n_artist_tracks:
                     artist_i_idx_sampled.append(-1)
 
                 i_idx.append(data.item[item])
@@ -175,3 +173,29 @@ def next_batch_pairwise(data,batch_size,n_negs=1):
                     neg_item = choice(item_list)
                 j_idx.append(data.item[neg_item])
         yield u_idx, i_idx, j_idx
+
+
+def next_batch_pairwise_CLCRec(data, batch_size, n_negs=1):
+    training_data = data.training_data
+    shuffle(training_data)
+    ptr = 0
+    data_size = len(training_data)
+    item_list = list(data.source_warm_item_idx)
+    while ptr < data_size:
+        if ptr + batch_size < data_size:
+            batch_end = ptr + batch_size
+        else:
+            batch_end = data_size
+        users = [training_data[idx][0] for idx in range(ptr, batch_end)]
+        items = [training_data[idx][1] for idx in range(ptr, batch_end)]
+        ptr = batch_end
+        u_idx, i_idx = [], []
+        for i, user in enumerate(users):
+            u_idx.append([data.user[user]]*(1+n_negs))
+            i_idx.append([data.item[items[i]]])
+            for m in range(n_negs):
+                neg_item = choice(item_list)
+                while neg_item in data.training_set_u[user]:
+                    neg_item = choice(item_list)
+                i_idx[i].append(data.item[neg_item])
+        yield u_idx, i_idx
