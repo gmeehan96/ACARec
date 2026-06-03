@@ -180,7 +180,6 @@ class GAR_Learner(nn.Module):
         self.latent_size = emb_size
         self.device = device
         self.data = data
-        self.cf_embs_file = args.cf_embs_file
         if self.args.cold_object == "item":
             self.item_content = torch.tensor(
                 self.data.mapped_item_content, dtype=torch.float32, requires_grad=False
@@ -191,7 +190,9 @@ class GAR_Learner(nn.Module):
             ).to(device)
 
         if args.use_artist_mean:
-            artist_means = torch.load(args.artist_mean_embs_file).cuda()
+            artist_means = torch.load(
+                f"./data/{self.args.dataset}/embs/{self.args.artist_mean_file}.pt"
+            ).cuda()
             self.item_content = torch.cat([artist_means, self.item_content], dim=1)
         self.content_dim = self.item_content.shape[1]
         self.generator = build_mlp(
@@ -214,7 +215,10 @@ class GAR_Learner(nn.Module):
         self.embedding_dict = self._init_model()
 
     def _init_model(self):
-        user_emb, item_emb = torch.load(self.cf_embs_file, map_location="cpu")
+        user_emb, item_emb = torch.load(
+            f"./data/{self.args.dataset}/embs/{self.args.backbone}.pt",
+            map_location="cpu",
+        )
         item_emb_mapped = torch.zeros(*item_emb.shape)
         for i, ind in enumerate([int(k) for k in self.data.item]):
             item_emb_mapped[i] = item_emb[ind]

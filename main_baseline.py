@@ -44,7 +44,7 @@ def main():
         return out_dict
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", default="citeulike")
+    parser.add_argument("--dataset", default="yambda", choices=["yambda", "m4a_onion"])
     parser.add_argument("--epochs", type=int, default=500)
     parser.add_argument("--topN", default="20")
     parser.add_argument("--bs", type=int, default=2048, help="training batch size")
@@ -65,9 +65,14 @@ def main():
     )
     parser.add_argument("--model", default="DeepMusic", type=str)
     parser.add_argument("--eval_freq", type=int, default=1)
-    parser.add_argument("--cf_embs_file", type=str, help="pt file containing CF embs")
     parser.add_argument(
-        "--artist_mean_embs_file", type=str, help="pt file containing artist means"
+        "--backbone", default="BPR", type=str, help="pt file containing CF embs"
+    )
+    parser.add_argument(
+        "--artist_mean_embs_file",
+        type=str,
+        default="artist_means_BPR",
+        help="pt file containing artist means",
     )
     parser.add_argument("--use_artist_mean", type=bool)
 
@@ -246,7 +251,8 @@ def main():
             "emb_size": 128 if args.dataset == "yambda" else 512,
         }
         config = {**config, **configs[dataset][artist_mean]}
-
+    config["backbone"] = args.backbone
+    config["artist_mean_embs_file"] = args.artist_mean_embs_file
     metrics_dict = objective(config)
     print(metrics_dict)
 

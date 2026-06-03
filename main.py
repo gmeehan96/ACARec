@@ -55,6 +55,9 @@ def main():
     )
     parser.add_argument("--runs_per_gpu", type=int, default=2)
     parser.add_argument("--eval_freq", type=int, default=1)
+    parser.add_argument(
+        "--backbone", default="BPR", type=str, help="pt file containing CF embs"
+    )
 
     args, _ = parser.parse_known_args()
     args = parser.parse_args()
@@ -94,7 +97,7 @@ def main():
         "emb_size": 128 if "yambda" in args.dataset else 512,
         "val_artist_tracks": 250,
         "use_self_attn": True,
-        "backbone": "BPR",
+        "backbone": args.backbone,
         "residual": False,
         "gru_mix": True,
         "glu_mix": False,

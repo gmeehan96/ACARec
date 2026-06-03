@@ -119,11 +119,13 @@ class DeepMusic_Learner(nn.Module):
         self.item_content = torch.tensor(
             self.data.mapped_item_content, dtype=torch.float32, requires_grad=False
         ).to(device)
-        self.cf_embs_file = args.cf_embs_file
+        self.backbone = args.backbone
 
         if args.use_artist_mean:
-            self.artist_means = torch.load(args.artist_mean_embs_file).cuda()
-            self.item_content = torch.cat([self.artist_means, self.item_content], dim=1)
+            artist_means = torch.load(
+                f"./data/{self.args.dataset}/embs/{self.args.artist_mean_file}.pt"
+            ).cuda()
+            self.item_content = torch.cat([artist_means, self.item_content], dim=1)
         self.content_dim = self.item_content.shape[1]
 
         self.embedding_dict = self._init_model()
@@ -136,24 +138,19 @@ class DeepMusic_Learner(nn.Module):
         )
 
     def _init_model(self):
-        user_emb, item_emb = torch.load(self.cf_embs_file, map_location="cpu")
-        if "BPR" in self.args.backbone:
-            item_emb_mapped = torch.zeros(*item_emb.shape)
-            for i, ind in enumerate([int(k) for k in self.data.item]):
-                item_emb_mapped[i] = item_emb[ind]
-            embedding_dict = nn.ParameterDict(
-                {
-                    "user_emb": user_emb[[int(k) for k in self.data.user]],
-                    "item_emb": self.args.emb_scale * item_emb_mapped,
-                }
-            )
-        else:
-            embedding_dict = nn.ParameterDict(
-                {
-                    "user_emb": user_emb,
-                    "item_emb": self.args.emb_scale * item_emb,
-                }
-            )
+        user_emb, item_emb = torch.load(
+            f"./data/{self.args.dataset}/embs/{self.args.backbone}.pt",
+            map_location="cpu",
+        )
+        item_emb_mapped = torch.zeros(*item_emb.shape)
+        for i, ind in enumerate([int(k) for k in self.data.item]):
+            item_emb_mapped[i] = item_emb[ind]
+        embedding_dict = nn.ParameterDict(
+            {
+                "user_emb": user_emb[[int(k) for k in self.data.user]],
+                "item_emb": self.args.emb_scale * item_emb_mapped,
+            }
+        )
         embedding_dict["user_emb"].requires_grad = False
         embedding_dict["item_emb"].requires_grad = False
         return embedding_dict

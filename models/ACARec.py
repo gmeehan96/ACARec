@@ -77,10 +77,11 @@ class ACARec(BaseColdStartTrainer_Artist):
                     n_negs=self.args.n_negs,
                 )
             ):
-                e_hat = model(item_idx, artist_item_idx)
+                e_hat, attn_weights, entropy = model(item_idx, artist_item_idx)
 
                 e_target = self.model.embedding_dict["item_emb"][item_idx]
                 loss = loss_fn(e_hat, e_target)
+                total_loss = loss
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -98,7 +99,7 @@ class ACARec(BaseColdStartTrainer_Artist):
                         val_artist_tracks=self.val_artist_tracks,
                     )
                 ):
-                    e_hat = model(item_idx, artist_item_idx)
+                    e_hat, attn_weights, _ = model(item_idx, artist_item_idx)
                     cold_outputs.append(e_hat)
                 cold_emb = torch.cat(cold_outputs)
                 self.item_emb.data[self.data.mapped_cold_item_idx] = cold_emb
@@ -147,7 +148,7 @@ class ACARec_Learner(nn.Module):
         self.query_proj = nn.Linear(self.content_dim, self.collab_dim)
         self.out_proj = nn.Linear(self.hidden_dim, self.collab_dim)
 
-        if args.use_self_attn:
+        if self.use_self_attn:
             self.self_attn = nn.MultiheadAttention(
                 self.hidden_dim,
                 num_heads,
@@ -181,7 +182,7 @@ class ACARec_Learner(nn.Module):
 
     def _init_model(self):
         user_emb, item_emb = torch.load(
-            f"./data/{self.args.dataset}/teachers/{self.args.backbone}.pt",
+            f"./data/{self.args.dataset}/embs/{self.args.backbone}.pt",
             map_location="cpu",
         )
 
@@ -241,6 +242,7 @@ class ACARec_Learner(nn.Module):
         c_t, c_i, e_i, mask = self.build_artist_inputs(
             item_idx_batch, artist_item_idx_batch
         )
+        B, K, _ = c_i.shape
 
         if self.residual or self.args.gru_mix or self.args.glu_mix:
             mask_f = mask.float()
